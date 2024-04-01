@@ -1,5 +1,5 @@
 #!/bin/bash
-# Version: 0.7.4
+# Version: 0.7.6
 # Script Name: pocket-openvpn.sh
 # OpenVPN certificate/users control
 # Run near easyrsa file
@@ -7,6 +7,7 @@
 # === VARS
 OPENVPN_SERVER_IP=192.168.130.22
 OPEN_VPN_PORT=1194
+OPEN_VPN_EXTERNAL_PORT=1194
 
 OPEN_VPN_DIR=/etc/openvpn
 USERS_DIR=$OPEN_VPN_DIR/users
@@ -33,8 +34,8 @@ SERVER_CRT=$EASY_RSA_DIR/pki/issued/server.crt
 CLIENT_KEY=$EASY_RSA_DIR/pki/private
 CLIENT_CRT=$EASY_RSA_DIR/pki/issued
 
-
-
+LOG=/var/log/openvpn/openvpn.log
+STATUS=/var/log/openvpn/openvpn-status.log
 
 # ==== COLOR VARS
 CLEAR_COLOR="\033[0m"
@@ -60,40 +61,42 @@ function fail_ok()
     fi
 }
 
+function check_file()
+{
+	if [ ! -f $2 ]; then
+        echo -e "$RED_COLOR Error! $1 file $2 not exist... $CLEAR_COLOR"
+		exit 2
+    fi
+    fail_ok "Check $1"
+}
+
+function check_dir()
+{
+	if [ ! -d $2 ]; then
+        echo -e "$RED_COLOR Error! $1 directory $2 not exist... $CLEAR_COLOR"
+		exit 2
+    fi
+    fail_ok "Check $1"
+}
+
 function check_files()
 {
     echo -e "$PURPLE_COLOR Check files $CLEAR_COLOR"
-
-    if [ ! -f $TA_KEY ]; then
-        echo -e "$RED_COLOR Error! TA_KEY file $TA_KEY not exist... $CLEAR_COLOR"
-    fi
-    fail_ok "Check TA_KEY"
-
-    if [ ! -f $CA_KEY ]; then
-        echo -e "$RED_COLOR Error! CA_KEY file $CA_KEY not exist... $CLEAR_COLOR"
-    fi
-    fail_ok "Check CA_KEY"
-
-    if [ ! -f $CA_CRT ]; then
-        echo -e "$RED_COLOR Error! CA_CRT file $CA_CRT not exist... $CLEAR_COLOR"
-    fi
-    fail_ok "Check CA_CRT"
-
-    if [ ! -f $DH ]; then
-        echo -e "$RED_COLOR Error! DH file $DH not exist... $CLEAR_COLOR"
-    fi
-    fail_ok "Check DH"
-
-    if [ ! -f $SERVER_KEY ]; then
-        echo -e "$RED_COLOR Error! SERVER_KEY file $SERVER_KEY not exist... $CLEAR_COLOR"
-    fi
-    fail_ok "Check SERVER_KEY"
-
-    if [ ! -f $SERVER_CRT ]; then
-        echo -e "$RED_COLOR Error! SERVER_CRT file $SERVER_CRT not exist... $CLEAR_COLOR"
-    fi
-    fail_ok "Check SERVER_CRT"
-
+	
+	echo "OpenVPN configs"
+	check_dir "OPEN_VPN_DIR" $OPEN_VPN_DIR
+	check_dir "USERS_DIR" $USERS_DIR
+	check_file "OPEN_VPN_SERVER_CONF" $OPEN_VPN_SERVER_CONF
+	check_file "LOG" $LOG
+	check_file "STATUS" $STATUS
+	echo "Easy-RSA"
+	check_file "TA_KEY" $TA_KEY
+	check_file "CA_KEY" $CA_KEY
+	check_file "CA_CRT" $CA_CRT
+	check_file "DH_KEY" $DH_KEY
+	check_file "CA_KEY" $CA_CRT
+	check_file "SERVER_KEY" $SERVER_KEY
+	check_file "SERVER_CRT" $SERVER_CRT
 }
 
 # === INSTALL FUNCTIONS
@@ -111,8 +114,8 @@ function install_server()
     fail_ok "Update packages"
 
     # EasyRSA
-    #curl -L $EASY_RSA_ARCHIVE -o $EASY_RSA_DOWNLOAD_DIR/$EASY_RSA_TAR
-    #fail_ok "Download EasyRSA"
+    curl -L $EASY_RSA_ARCHIVE -o $EASY_RSA_DOWNLOAD_DIR/$EASY_RSA_TAR
+    fail_ok "Download EasyRSA"
 
     cd $OPEN_VPN_DIR
     tar xvf $EASY_RSA_TAR
@@ -206,6 +209,9 @@ function bootstrap_openvpn()
 
     openvpn --genkey --secret ta.key
     fail_ok "Generate ta.key"
+	
+	touch $USERS_DIR/ovpn_users.txt
+	fail_ok "Create users list"
 }
 
 function tepmlate_server_config()
@@ -239,11 +245,11 @@ comp-lzo
 tun-mtu 1500
 mssfix 1620
 # Logs
-status /var/log/openvpn/openvpn-status.log
-log-append /var/log/openvpn/openvpn.log
+log-append $LOG
+status $STATUS
 
 # Network settings
-server 10.0.0.0 255.255.255.0
+server 10.8.0.0 255.255.255.0
 topology subnet
 push "dhcp-option DNS 8.8.8.8"
 #push "route 192.168.77.0 255.255.255.0"
@@ -256,6 +262,12 @@ function restart_server()
 {
 	systemctl restart openvpn@server
 }
+
+function server_status()
+{
+	cat $STATUS
+}
+
 # === USER FUNCTIONS
 function add_user()
 {
@@ -311,26 +323,26 @@ function copy_user()
 function template_client_ovpn()
 {
 cat << EOF > $USERS_DIR/$OVPN_USER/$OVPN_USER.ovpn
-$OVPN_USER
-cert $OVPN_USER .crt
-key $OVPN_USER.key
-ca ca.crt
-tls-client
-tls-auth ta.key 1
+client
+dev tun
+proto udp
+remote $OPENVPN_SERVER_IP $OPEN_VPN_EXTERNAL_PORT
 resolv-retry infinite
 nobind
-remote $OPENVPN_SERVER_IP $OPEN_VPN_PORT
-proto udp
-dev tun
+persist-tun
+ca ca.crt
+cert $OVPN_USER.crt
+key $OVPN_USER.key
+tls-client
+tls-auth ta.key 1
+persist-key
 comp-lzo
 float
 keepalive 10 120
-persist-key
-persist-tun
 tun-mtu 1500
 mssfix 1620
 cipher AES-256-GCM
-verb 0
+verb 3
 EOF
 fail_ok "Template client $OVPN_USER.ovpn config"
 }
@@ -360,10 +372,9 @@ command()
         tepmlate_server_config
 		restart_server
         ;;
-    user)
+    useradd)
         check_easyrsa_path
         add_user
-        check_files
         copy_user
         template_client_ovpn
         ;;
@@ -372,16 +383,19 @@ command()
 		reconfigure_client_ovpn
 		restart_server
         ;;
+	status)
+        server_status
+        ;;
     check)
         check_easyrsa_path
         check_files
         ;;
     *)
-        echo "Usage: $0 { install | user | configure }"
+        echo "Usage: $0 { install | useradd | configure }"
         echo ""
         echo "    install - install OpenVPN Server"
         echo "    bootstrap - Destroy OpenVPN server (clean certs) & install new"
-        echo "    user <user_name> - create user"
+        echo "    useradd <user_name> - create user"
         echo "    configure - reconfigure OpenVPN server"
         echo "    check - check configs files for exsists"
         exit 1
