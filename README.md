@@ -12,12 +12,25 @@ Rocky 8, Rocky 9
 Oracle Linux 7 (need manual install bind package) Oracle 8, Oracle 9  
 Fedora 37, Fedora 38  
 
-Usage: Run script & read docs  
-• Download script  
-• vi pocket-dns.sh - fill vars  
-• chmod +x pocket-dns.sh  
-• ./pocket-dns.sh install  
-• ./pocket-dns.sh check  
+### Usage: Run script & read docs  
+Download script from GIT  
+
+Fill vars  
+```
+vi pocket-dns.sh
+```
+Set script executeble  
+```
+chmod +x pocket-dns.sh  
+```
+Isntall bind/named  
+```
+./pocket-dns.sh install
+```
+Check DNS
+```
+./pocket-dns.sh check
+```
 
 ## pocket-openvpn.sh
 Install & configure OpenVPN  
