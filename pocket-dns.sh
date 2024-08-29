@@ -111,6 +111,11 @@ function get_os_value() {
     else
         cat /etc/os-release | grep ^$1 | grep -o '[^=]*$'
     fi
+	# NAME: CentOS Linux, Oracle Linux Server, RED OS, CentOS Stream, 
+	# AlmaLinux, Rocky Linux, ALT Server, openSUSE Leap, Fedora Linux, 
+	# Debian GNU/Linux, Ubuntu, Astra Linux (Orel)
+	#
+	# ID: centos, ol, redos, almalinux, rocky, altlinux, opensuse-leap, fedora, debian, ubuntu, astra
 }
 OS=`get_os_value "NAME"`
 
@@ -385,8 +390,8 @@ function uninstall_dns
 }
 
 command() {
-  case "$1" in
-	install)
+case "$1" in
+		install)
 		install_dns
 		init_configs
 		configure_dns
