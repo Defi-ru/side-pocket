@@ -13,11 +13,11 @@ Oracle Linux 7 (need manual install bind package) Oracle 8, Oracle 9
 Fedora 37, Fedora 38  
 
 ### Usage: Run script & read docs
-Prepaer DNS clients → Linux hosts must be referenced to our DNS server
-Sometimes it is recommended to write it in /etc/resolv.conf, but this is not the right way. It will work only until reboot
-The settings will depend on your OS, in RHEL-like/CentOS I recommend using `nmtui` utility
+Prepaer DNS clients → Linux hosts must be referenced to our DNS server.  
+Sometimes it is recommended to write it in /etc/resolv.conf, but this is not the right way. It will work only until reboot.  
+The settings will depend on your OS, in RHEL-like/CentOS I recommend using `nmtui` utility.  
 
-Firewall on RHEL-like (if used)
+Firewall on RHEL-like (if used)  
 ```
 firewall-cmd --permanent --add-protocol=53/udp
 firewall-cmd --reload
