@@ -1,8 +1,8 @@
 #!/bin/bash
-# Version: 0.7.6
+# Version: 0.8.2
 # Script Name: pocket-openvpn.sh
 # OpenVPN certificate/users control
-# Run near easyrsa file
+
 
 # === VARS
 OPENVPN_SERVER_IP=192.168.130.22
@@ -99,19 +99,48 @@ function check_files()
 	check_file "SERVER_CRT" $SERVER_CRT
 }
 
+function get_os_value() 
+{
+    # Check quotes
+    cat /etc/os-release | grep ^$1 | grep \" > /dev/null 2>&1
+
+    # Value with quotes
+    if [[ $? == 0 ]]; then
+        cat /etc/os-release | grep ^$1 | grep -o '"[^"]*"' | cut -c2- | rev | cut -c2- | rev
+    # Value without quotes
+    else
+        cat /etc/os-release | grep ^$1 | grep -o '[^=]*$'
+    fi
+	# NAME: CentOS Linux, Oracle Linux Server, RED OS, CentOS Stream, 
+	# AlmaLinux, Rocky Linux, ALT Server, openSUSE Leap, Fedora Linux, 
+	# Debian GNU/Linux, Ubuntu, Astra Linux (Orel)
+	#
+	# ID: centos, ol, redos, almalinux, rocky, altlinux, opensuse-leap, fedora, debian, ubuntu, astra
+}
+OS=`get_os_value "NAME"`
+
+# OS correction
+if [[ $OS == "RED OS" ]]; then
+	OPEN_VPN_SERVER_CONF=$OPEN_VPN_DIR/server/server.conf
+	fail_ok "Set up config file location for RED OS"
+fi
+
 # === INSTALL FUNCTIONS
 function install_server()
 {
     # OpenVPN
-    echo -e "$PURPLE_COLOR Install OpenVPN $CLEAR_COLOR"
-    yum install epel-release -y #> /dev/null 2>&1
-    fail_ok "Install epel-release"
+	if [[ $OS == "CentOS Linux" ]]; then
+		echo -e "$PURPLE_COLOR Install OpenVPN $CLEAR_COLOR"
+		yum install epel-release -y #> /dev/null 2>&1
+		fail_ok "Install epel-release"
+		
+		yum install openvpn -y #> /dev/null 2>&1
+		fail_ok "Update packages"
+	fi
 
-    #yum update -y #> /dev/null 2>&1
-    #fail_ok "Update packages"
-
-    yum install openvpn -y #> /dev/null 2>&1
-    fail_ok "Update packages"
+    if [[ $OS == "RED OS" ]]; then
+		dnf install openvpn -y
+	fi
 
     # EasyRSA
     curl -L $EASY_RSA_ARCHIVE -o $EASY_RSA_DOWNLOAD_DIR/$EASY_RSA_TAR
@@ -155,6 +184,26 @@ function check_easyrsa_path()
         exit 1
     fi
 
+}
+
+function check_install()
+{
+	if [ ! -d $OPEN_VPN_DIR ]; then
+        echo -e "$RED_COLOR Error! $OPEN_VPN_DIR not exist! $CLEAR_COLOR"
+        echo "Use:"
+		echo -e "$0 install"
+		exit 2
+    fi
+}
+
+function check_bootstrap()
+{
+	if [ ! -f $CA_KEY ]; then
+        echo -e "$RED_COLOR Error! $CA_KEY not exist! $CLEAR_COLOR"
+		echo "Use:"
+        echo -e "$0 bootstrap"
+		exit 2
+    fi
 }
 
 function template_vars()
@@ -210,9 +259,13 @@ function bootstrap_openvpn()
     openvpn --genkey --secret ta.key
     fail_ok "Generate ta.key"
 	
+	mkdir -p $USERS_DIR
+    fail_ok "Create users dir: $USERS_DIR"
+	
 	touch $USERS_DIR/ovpn_users.txt
 	fail_ok "Create users list"
 }
+
 
 function tepmlate_server_config()
 {
@@ -260,11 +313,18 @@ fail_ok "Template OpenVPN Server Config"
 
 function restart_server()
 {
-	systemctl restart openvpn@server
+	if [[ $OS == "CentOS Linux" ]]; then
+		systemctl restart openvpn@server
+	fi
+	
+	if [[ $OS == "RED OS" ]]; then
+		systemctl restart openvpn-server@server
+	fi
 }
 
 function server_status()
 {
+	check_file $STATUS
 	cat $STATUS
 }
 
@@ -366,6 +426,7 @@ command()
         install_server
         ;;
     bootstrap)
+		check_install
         check_easyrsa_path
         template_vars
         bootstrap_openvpn
@@ -379,6 +440,8 @@ command()
         template_client_ovpn
         ;;
     configure)
+		check_bootstrap
+		check_install
         tepmlate_server_config
 		reconfigure_client_ovpn
 		restart_server
