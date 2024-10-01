@@ -1,6 +1,13 @@
 # side-pocket
 Small scripts help with infrastructure deployment
 
+Get
+```
+dnf install git -y
+git clone https://github.com/Defi-ru/side-pocket.git
+cd side-pocket
+```
+
 ## pocket-dns.sh
 Install & configure DNS  
 
@@ -25,7 +32,7 @@ firewall-cmd --reload
 
 Download script from GIT  
 
-Fill vars  
+Fill vars (DNS server IP, servers name/ip)
 ```
 vi pocket-dns.sh
 ```
@@ -45,22 +52,49 @@ Check DNS
 ## pocket-openvpn.sh
 Install & configure OpenVPN  
 
-Supported OS: CentOS 7  
+Supported OS: CentOS 7, Red OS 7.3.4
 
-Usage: Run script & read docs  
+### Usage
+Fill vars (IP, ports)
+```
+vi pocket-openvpn.sh
+```
+Prepare script
+```
+chmod +x pocket-openvpn.sh
+```
 
-### 1. When script ask server name, print:
+### 1. Install packages
+```
+./pocket-openvpn.sh install
+```
+
+When script ask server name, print:  
 ```
 server
 ```
 
-### 2. On CentOS 7 set on "ip forwarding"
+### 2. Bootsrap (create CA, DH, keys and certs)
+```
+./pocket-openvpn.sh bootstrap
+```
+
+### 3. Add user (user01 as example)
+```
+./pocket-openvpn.sh useradd user01
+```
+Get user dir /etc/openvpn/users/user01 & send it to user
+Install "OpenVPN Connect" to user  
+Add openvpn config file "user01.ovpn" to "OpenVPN Connect"  
+
+
+### 4. On CentOS 7 set on "ip forwarding"
 ```
 echo "net.ipv4.ip_forward = 1" >> /etc/sysctl.conf
 sysctl -p
 ```
 
-### 3.Firewalld (modern)
+### 5.Firewalld (modern)
 ```
 systemctl start firewalld
 systemctl enable firewalld
@@ -76,9 +110,18 @@ iptables -t nat -A POSTROUTING -s 10.8.0.0/24 -o eth0 -j MASQUERADE
 
 # Release Notes
 ## pocket-dns.sh
-v1.1.1
+v1.1.1  
 - refactoring code. Array replaced by dictionary
 - add in "check" command nslookup test
 - support new OS: Alma, Rocky, Oracle, new CentOS, Fedora
 
-v1.0.0 base version
+v1.0.0  
+- base version
+
+## pocket-openvpn.sh
+v0.8.2  
+- Add Red OS 7.3.4 support
+- Rework documentation
+
+v0.7.6  
+- Add CentOS 7 support
