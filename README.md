@@ -99,7 +99,7 @@ sysctl -p
 systemctl start firewalld
 systemctl enable firewalld
 firewall-cmd --permanent --add-service openvpn
-firewall-cmd --add-masquerade
+firewall-cmd --permanent --add-masquerade
 firewall-cmd --reload
 ```
 
